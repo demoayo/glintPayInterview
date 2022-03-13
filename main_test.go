@@ -23,15 +23,15 @@ func TestArgsProcessing(t *testing.T) {
 					{"field": "description", "cmp": "=", "value": "CARD SPEND"},
 					{"field": "month", "cmp": "=", "value": "1"}
 					], 
-				"topN": 5}`,
+				"top_n": 5}`,
 			expect: true,
 			actual: func(params string) bool {
-				spec, err := TransformArgsToSpec(params)
+				req, err := TransformArgsToTopNSpendersRequest(params)
 				if err != nil {
 					log.Println(err.Error())
 				}
 
-				return spec != nil && len(spec.Filters) == 2 && spec.TopNCount == 5
+				return req != nil && len(req.Filters) == 2 && req.TopNCount == 5
 
 			},
 		},
@@ -94,18 +94,18 @@ func TestMatchFilterCriteria(t *testing.T) {
 	}
 }
 
-func TestCalculateTopNSpenders(t *testing.T) {
+func TestComputeTopNForFilteredSpenders(t *testing.T) {
 	testCases := []struct {
 		name   string
 		desc   string
 		expect bool
-		params *ComputeTopNForFilteredSpendersParam
-		actual func(params *ComputeTopNForFilteredSpendersParam) bool
+		params *ComputeTopNForFilteredSpendersRequest
+		actual func(params *ComputeTopNForFilteredSpendersRequest) bool
 	}{
 		{
-			name: "main.CalculateTopNSpenders",
-			desc: "Calculates Top N Spenders",
-			params: &ComputeTopNForFilteredSpendersParam{
+			name: "service.ComputeTopNForFilteredSpenders",
+			desc: "Calculates Top N for filtered Spenders using service",
+			params: &ComputeTopNForFilteredSpendersRequest{
 				TopNCount: 10,
 				Filters: []Filters{
 					{Field: "Description", Cmp: "=", Value: "CARD SPEND"},
@@ -120,12 +120,59 @@ func TestCalculateTopNSpenders(t *testing.T) {
 				},
 			},
 			expect: true,
-			actual: func(params *ComputeTopNForFilteredSpendersParam) bool {
-				topNSpenders := ComputeTopNForFilteredSpenders(params)
-				return ((len(topNSpenders) == 3) &&
-					(topNSpenders[0].Email == "1@email.com") &&
-					(topNSpenders[1].Email == "2@email.com") &&
-					(topNSpenders[2].Email == "3@email.com"))
+			actual: func(params *ComputeTopNForFilteredSpendersRequest) bool {
+				service := NewService()
+				resp := service.ComputeTopNForFilteredSpenders(params)
+				return (resp.Spenders != nil &&
+					(len(resp.Spenders) == 3) &&
+					(resp.Spenders[0].Email == "1@email.com") &&
+					(resp.Spenders[1].Email == "2@email.com") &&
+					(resp.Spenders[2].Email == "3@email.com"))
+			},
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			actual := tC.actual(tC.params)
+			if actual != tC.expect {
+				t.Errorf("\nExpecting: %v \nActual: %v \nDescription: %v \n", tC.expect, actual, tC.desc)
+			}
+		})
+	}
+}
+
+func TestTopNSpenders(t *testing.T) {
+	testCases := []struct {
+		name   string
+		desc   string
+		expect bool
+		params *TopNSpendersRequest
+		actual func(params *TopNSpendersRequest) bool
+	}{
+		{
+			name: "service.ComputeTopNForFilteredSpenders",
+			desc: "Calculates Top 5 Spenders using service",
+			params: &TopNSpendersRequest{
+				TopNCount: 5,
+				Filters: []Filters{
+					{Field: "Description", Cmp: "=", Value: "CARD SPEND"},
+					{Field: "Month", Cmp: "=", Value: "2"},
+				},
+				FileName: "sample-transactions.csv",
+			},
+			expect: true,
+			actual: func(params *TopNSpendersRequest) bool {
+				service := NewService()
+				resp := service.TopNSpenders(params)
+				return (resp.Spenders != nil &&
+					(resp.OutputFilePath != "") &&
+					(len(resp.Spenders) == 5) &&
+					(resp.Spenders[0].Email == "kaif.beck@mailinator.com") &&
+					(resp.Spenders[1].Email == "ceara.valdez@mailinator.com") &&
+					(resp.Spenders[2].Email == "cosmo.mansell@mailinator.com") &&
+					(resp.Spenders[3].Email == "andy.nguyen@mailinator.com") &&
+					(resp.Spenders[4].Email == "finlay.rasmussen@mailinator.com"))
+
 			},
 		},
 	}
